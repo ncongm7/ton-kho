@@ -12,7 +12,7 @@ import { calculateInventory } from './data/mockData';
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama3-8b-8192";
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwazPWhQIrENpISiFadJcuhW4a7BU68dXzZHMCqcpEuVPgpZhrn33TTgb8_28FXC90/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzStyKfLD1JAY-CNKnetI1dJjxwFEbyONx_GdY3Gc6x7SBlBmaVPFIhSQLJKLUT3lwq/exec";
 
 // ================================
 // CÁC HẰNG SỐ
@@ -80,19 +80,25 @@ function App() {
 
       addLog("Đang đồng bộ dữ liệu...", 'sys');
       const response = await fetch(`${fetchUrl}?action=GET_DATA`);
+
+      if (!response.ok) {
+        throw new Error(`Lỗi HTTP: ${response.status}`);
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("API không trả về JSON (Có thể do chưa mở quyền 'Anyone')");
+      }
+
       const json = await response.json();
 
-      if (json.products) {
-        setDataProducts(json.products);
-      }
-      if (json.transactions) {
-        setDataTransactions(json.transactions);
-      }
+      if (json.products) setDataProducts(json.products);
+      if (json.transactions) setDataTransactions(json.transactions);
 
       addLog("Đã cập nhật dữ liệu mới nhất.", 'sys');
     } catch (error) {
       console.error("Fetch Error:", error);
-      addLog(`Lỗi: ${error.message}`, 'error');
+      addLog(`Lỗi tải dữ liệu: ${error.message}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -217,7 +223,8 @@ function App() {
 
       } catch (e) {
         console.error(e);
-        speak("Có lỗi khi lưu dữ liệu. Vui lòng kiểm tra lại.");
+        speak(`Lỗi: ${e.message}`);
+        addLog(`Lỗi xử lý giọng nói: ${e.message}`, 'error');
       }
 
       setPendingCommand(null);
@@ -256,6 +263,8 @@ Người dùng nói:
 Hãy trích xuất lệnh.`;
 
     try {
+      if (!GROQ_API_KEY) throw new Error("Chưa có API KEY");
+
       const res = await fetch(GROQ_ENDPOINT, {
         method: "POST",
         headers: {
@@ -272,6 +281,10 @@ Hãy trích xuất lệnh.`;
           max_tokens: 150
         })
       });
+
+      if (!res.ok) {
+        throw new Error(`Lỗi Groq: ${res.status}`);
+      }
 
       const data = await res.json();
       const content = data.choices[0]?.message?.content;
