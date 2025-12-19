@@ -1,0 +1,6 @@
+@echo off
+echo Setting up environment...
+SET PATH=C:\Program Files\nodejs;%PATH%
+echo Starting Warehouse Assistant...
+call npm run dev
+pause
